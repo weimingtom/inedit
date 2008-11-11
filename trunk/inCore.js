@@ -205,13 +205,13 @@ var inCore={
 		if (!node.nodeType || !attrs) return this;
 		if(typeof attrs=='string')
 			if(attrs.indexOf(',')==-1)
-				return (attrs===attrs.toLowerCase())?node.getAttribute(attrs):node[attrs];
+				return node.getAttribute(attrs)||node[attrs];
 			else
 				attrs=attrs.split(',');
 		if (attrs instanceof Array){
 			var ret={};
 			for (var i=0;i<attrs.length ;i++ )
-				ret[attrs[i]]=(attrs[i]===attrs[i].toLowerCase())?node.getAttribute(attrs[i]):node[attrs[i]];
+				ret[attrs[i]]=node.getAttribute(attrs[i])||node[attrs[i]];
 			return ret;
 		}
 		for (var a in attrs){
