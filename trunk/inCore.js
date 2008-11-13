@@ -359,9 +359,10 @@ var inQueue={
 			this.Queues.splice(i,1);
 		return this;
 	},/*触发/传递Event事件*/
-	fireQueue:function(withthis,domain,type,e){
+	fireQueue:function(withthis,domain,type){
 		/*队列:支持系统事件队列和自定义指令队列
 		 */
+		var e=arguments[3];
 		var isEvent=(e && e.type===type);
 		if (isEvent){//兼容性处理
 			if(!e.target && e.srcElement) e.target = e.srcElement;
@@ -380,7 +381,7 @@ var inQueue={
 		}
 		var fns=this.findQueue(domain,type);
 		var re=false;
-		var args=[e].concat([].slice.call(arguments,4));
+		var args=[].slice.call(arguments,3);
 		var ret=type=='Array'?[]:null,step=1,re,removeEvent=false,removeQueue=false;
 		var cancelBubble=false;
 		for (var i=0;i<fns.len ;i=i+step) {
