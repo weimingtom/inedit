@@ -9,7 +9,7 @@
  * 因此对 inEdit 对象来说不需要实例化,直接操作就行了
  * $Author: achun (achun.shx at gmail.com)
  * $Create Date: 2008-10-30
- * $Revision: 8.10.30
+ * $Revision: 2008-11-13
  ******/
 
 /**
@@ -106,7 +106,6 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 			'position':'relative'
 		});
 		this.enable=false;
-		this.setStyle(elem.childNodes,{display:'none'});
 		elem.appendChild(panel);
 		this.panel=panel;
 		var box=document.createElement('DIV');
@@ -183,7 +182,7 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		});
 		if(!bt) {return;}
 		var xy=this.fetch(e,'clientX,clientY,layerX,layerY');
-		var args=[inMixin(xy,bt)].concat([].splice.call(arguments,1,arguments.length));
+		var args=[inMixin(xy,bt)].concat([].slice.call(arguments,1));
 		this.onClickPanelButton.apply(this,args);
 	},/*处理触发命令*/
 	onClickPanelButton:function(bt,arg){
@@ -192,7 +191,7 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		if (!bt.keepmodalBox) this.modalBox();
 		if(!this.enable) return;
 		if(typeof this[bt.command]=='function')
-			this[bt.command].apply(this,[].splice.call(arguments,0,arguments.length));
+			this[bt.command].apply(this,[].slice.call(arguments,0));
 		else{
 			this.execCommand(bt.command,arg||bt.arg);
 		}
@@ -240,7 +239,7 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		if (undefined==domain) this.Instances=[];
 		else for (var i=0;i<this.Instaces.length ;i++ ) {
 			if (this.Instances[i]===domain) {
-				this.Instaces=this.Instaces.splice(0,i).concat(this.Instances.splice(i+1,this.Instaces.length));
+				this.Instaces.splice(i,1);
 				break;
 			}
 		}
@@ -357,6 +356,8 @@ inEdit.__('zh-cn',{
 });
 /*配置*/
 inEdit.mixin({
+	transparentGif:'/style/imgs/pixel.gif',
+	iconsPath : '/style/imgs/nicEditorIconsfull.gif',
 	buttonList : [
 		'save','saveall','undo','redo','|',
 		'bold','italic','underline','strikethrough','subscript','superscript',
