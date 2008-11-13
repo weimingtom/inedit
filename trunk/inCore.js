@@ -7,7 +7,7 @@
  *
  * $Author: achun (achun.shx at gmail.com)
  * $Create Date: 2008-10-30
- * $Revision: 8.10.30
+ * $Revision: 2008-11-13
  ******/
 /**
  * 混入模式的对象成员覆盖式扩展,使用此模式后prototype属性将不再可靠
@@ -269,9 +269,9 @@ var inQueue={
 		if (!this.Queues) this.Queues=[];
 		for (var i=0;i<this.Queues.length ; i++) {
 			if (this.Queues[i].domain===domain){
-				if(!type) return i;
+				if(undefined==type) return i;
 				for (var j in this.Queues[i].type ){
-					if(j!==type) continue;
+					if(j!=type) continue;
 					if(index) return i;
 					return this.Queues[i].type[type];
 				}
@@ -324,7 +324,7 @@ var inQueue={
 				domain.attachEvent("on"+type, q.type[type]);
 			ef=q.type[type];
 		}
-		ef['0'+(ef.len++)]={fun:fn,args:[].splice.call(arguments,4,arguments.length)};
+		ef['0'+(ef.len++)]={fun:fn,args:[].slice.call(arguments,4)};
 		return this;
 	},/*删除一个或全部队列,也可以在window unload 中设置这调用*/
 	removeQueue:function (domain,type){
@@ -356,7 +356,7 @@ var inQueue={
 			delete q.type[j];
 		}
 		if(undefined===type || cnt===0)
-			this.Queues=this.Queues.splice(0,i).concat(this.Queues.splice(i+1));
+			this.Queues.splice(i,1);
 		return this;
 	},/*触发/传递Event事件*/
 	fireQueue:function(withthis,domain,type,e){
@@ -380,7 +380,7 @@ var inQueue={
 		}
 		var fns=this.findQueue(domain,type);
 		var re=false;
-		var args=[e].concat([].splice.call(arguments,4,arguments.length));
+		var args=[e].concat([].slice.call(arguments,4));
 		var ret=type=='Array'?[]:null,step=1,re,removeEvent=false,removeQueue=false;
 		var cancelBubble=false;
 		for (var i=0;i<fns.len ;i=i+step) {
@@ -402,7 +402,7 @@ var inQueue={
 				switch (type) {
 				case 'Chain':withthis=re;break;//链式改变 this 
 				case 'Relay'://值接力
-					args=[e].concat([].splice.call(arguments,4,arguments.length));
+					args=[e].concat([].slice.call(arguments,4));
 					if (re instanceof Array)
 						args.concat(re);
 					else
@@ -422,33 +422,33 @@ var inQueue={
 			if(type==='FireOnce') this.removeQueue(domain,type);
 		}
 		if (type==='Array') return ret;
-		return this;
+		return re;
 	},/*为对象自己增加this域命令队列*/
 	addCmd:function(cmd,fn){
-		if (typeof cmd==='string'){/*支持fn数组*/
+		if (typeof cmd==='string' || typeof cmd==='number'){/*支持fn数组*/
 			var funs=typeof fn=='function'?[fn]:fn;
-			var args=[].splice.call(arguments,2,arguments.length);
+			var args=[].slice.call(arguments,2);
 			for (var i=0;i<funs.length ;i++ ) 
 				this.addQueue.apply(this,[this,'this',funs[i],cmd].concat(args));
 		}else{/*简单设定多个队列*/
-			var args=[].splice.call(arguments,1,arguments.length);
+			var args=[].slice.call(arguments,1);
 			for (var k in cmd)
 				this.addQueue.apply(this,[this,'this',cmd[k],k].concat(args));
 		}
 		return this;
 	},/*触发一个队列命令,如果附加了参数那么会覆盖 addCmd 中的附加参数*/
 	fireCmd:function(cmd){
-		var args=[this,'this',cmd].concat([].splice.call(arguments,1,arguments.length));
+		var args=[this,'this',cmd].concat([].slice.call(arguments,1));
 		return this.fireQueue.apply(this,args);
 	},/*添加 DOMElement 事件*/
 	addEvent:function(withthis,elem,type,fn){
 		if (typeof type==='string'){/*支持多 Element 绑定一个fun*/
 			var elems=elem.nodeType?[elem]:elem;
-			var args=[].splice.call(arguments,4,arguments.length);
+			var args=[].slice.call(arguments,4);
 			for (var i=0;i<elems.length ;i++ )
 				this.addQueue.apply(this,[withthis,elems[i],fn,type].concat(args));
 		}else{/*一个 Element 绑定多个type和fun*/
-			var args=[].splice.call(arguments,3,arguments.length);
+			var args=[].slice.call(arguments,3);
 			for (var k in type)
 				this.addQueue.apply(this,[withthis,elem,type[k],k].concat(args));
 		}
@@ -459,29 +459,8 @@ var inQueue={
 			var args=[null,e,withthis.type,withthis],i=2;
 		else
 			var args=[withthis,elem,e.type,e],i=3;
-		args.concat([].splice.call(arguments,i,arguments.length));
+		args.concat([].slice.call(arguments,i));
 		this.Queue.fire.apply(this,args);
 		return this;
 	}
 };
-
-/*DOMNode集合
- *对 DOMElement 操作的基础
- *返回一个空的inNode实例对象,
- *inNode实例对象和inNode对象的区别是inNode对象是function,inNode实例是{}
- *输入参数
- *  nodeType:可以是字符串形式的不同nodeType组合,比如'1,3',默认1
- *注意:必须实例化后才能用
-	元素1  	ELEMENT_NODE
-	属性2 	ATTRIBUTE_NODE
-	文本3 	TEXT_NODE
-	4 	CDATA_SECTION_NODE
-	5 	ENTITY_REFERENCE_NODE
-	6 	ENTITY_NODE
-	7 	PROCESSING_INSTRUCTION_NODE
-	注释8 	COMMENT_NODE
-	文档9 	DOCUMENT_NODE
-	10 	DOCUMENT_TYPE_NODE
-	11 	DOCUMENT_FRAGMENT_NODE
-	12 	NOTATION_NODE
- */
