@@ -9,7 +9,7 @@
  * 因此对 inEdit 对象来说不需要实例化,直接操作就行了
  * $Author: achun (achun.shx at gmail.com)
  * $Create Date: 2008-10-30
- * $Revision: 2008-11-13
+ * $Revision: 2008-12-18
  ******/
 
 /**
@@ -95,11 +95,11 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 				}
 				bt.inEditButton=bn;
 			}
-			this.setStyle(bt,st);
+			this.Style(bt,st);
 			panel.appendChild(bt);
 		}
 		this.addEvent(this,panel,'click',this.onClickPanel);
-		this.setStyle(panel,{
+		this.Style(panel,{
 			'background-color':'#EFEFEF',
 			'padding-top':'4px',
 			'border':'#CCCCCC solid 1px',
@@ -109,7 +109,7 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		elem.appendChild(panel);
 		this.panel=panel;
 		var box=document.createElement('DIV');
-		this.setStyle(box,{
+		this.Style(box,{
 			'background-color':'#EFEFEF',
 			'padding':'4px',
 			'border':'#CCCCCC solid 1px',
@@ -119,21 +119,13 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		});
 		panel.appendChild(box);
 		this.modalPanel=box;
-		if('firefox,mozilla'.indexOf(this.browser.is)!=-1){
-			var b=document.createElement('div');
-			b.inEditButton={command:'modalBox'};
-			b.innerHTML=this.__('firefox`s compatible problem');
-			this.setStyle(b,{cursor:'pointer'});
-			this.modalPanel.appendChild(b);
-			this.setStyle(this.modalPanel,{'display':''});
-		}
 		return this;
 	},/*设置面板是否接受操作*/
 	onDisable:function(e){
 		var from='';
 		this.traceNode(e.target,function(n){
 			if('true'==n.contentEditable ){
-				from='instance'
+				from='instance';
 				return false;
 			}
 			if(n==this.panel){
@@ -141,33 +133,23 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 				return false;
 			}
 		});
-		if (!from && this.enable){
+		var same=this.enable;
+		if(!from) {
 			this.enable=false;
 			this.modalBox();
-			/*IE 6 闪烁的厉害,opacity就算了吧*/
-			if (this.browser.is=='msie' && this.browser.ver<'7')
-				var st={cursor:'not-allowed'};
-			else
-				var st={opacity:0.5,cursor:'not-allowed'};
-			this.walkNode(this.panel,function(node){
-				if (node.inEditButton)
-					this.setStyle(node,st);
-				return false;
-			});
-		}
-		if('instance'==from && !this.enable){
+		}else if ('instance'==from)
 			this.enable=true;
-			/*IE 6 闪烁的厉害,opacity就算了吧*/
-			if (this.browser.is=='msie' && this.browser.ver<'7')
-				var st={cursor:'pointer'};
-			else
-				var st={opacity:1,cursor:'pointer'};
-			this.walkNode(this.panel,function(node){
-				if (node.inEditButton)
-					this.setStyle(node,st);
-				return false;
-			});
-		}
+		same=same==this.enable;
+		if (same) return;
+		/*IE 6 闪烁的厉害,opacity就算了吧*/
+		var st={cursor:this.enable?'pointer':'not-allowed'};
+		if (!(this.browser.is=='msie' && this.browser.ver<'7'))
+			st.opacity=this.enable?1:0.5;
+		this.walkNode(this.panel,function(node){
+			if (node.inEditButton)
+				this.Style(node,st);
+			return false;
+		});
 	},/*面板发生了 chick */
 	onClickPanel:function(e){
 		if(!e || !e.target) {return;}
@@ -182,7 +164,7 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		});
 		if(!bt) {return;}
 		var xy=this.fetch(e,'clientX,clientY,layerX,layerY');
-		var args=[inMixin(xy,bt)].concat([].slice.call(arguments,1));
+		var args=[inMixin(xy,bt)].concat(Array.prototype.slice.call(arguments,1));
 		this.onClickPanelButton.apply(this,args);
 	},/*处理触发命令*/
 	onClickPanelButton:function(bt,arg){
@@ -191,7 +173,7 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		if (!bt.keepmodalBox) this.modalBox();
 		if(!this.enable) return;
 		if(typeof this[bt.command]=='function')
-			this[bt.command].apply(this,[].slice.call(arguments,0));
+			this[bt.command].apply(this,Array.prototype.slice.call(arguments,0));
 		else{
 			this.execCommand(bt.command,arg||bt.arg);
 		}
@@ -207,7 +189,7 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 				border:ins[i].style.border,
 				padding:ins[i].style.padding
 			};
-			this.setStyle(ins[i],{border:'2px solid #F1CA7F',padding:"10px 0"});
+			this.Style(ins[i],{border:'2px solid #F1CA7F',padding:"10px 0"});
 			/*fix browser bug*/
 			switch (this.browser.is) {
 			case 'msie':
@@ -230,7 +212,7 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		this.each(this.Queues,function(q){
 			if ((undefined==domain || domain===q.domain) && 'true'==q.domain.contentEditable) {
 				q.domain.contentEditable="inherit";
-				this.setStyle(q.domain,q.domain.inEditSaveStyle);
+				this.Style(q.domain,q.domain.inEditSaveStyle);
 				delete q.domain.inEditSaveStyle;
 				this.removeQueue(q.domain);//删除事件
 				if(domain) return false;
@@ -255,40 +237,43 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 	},/*弹出modal box*/
 	modalBox:function(bt){
 		if (!arguments.length)
-			return this.setStyle(this.modalPanel,{display:'none'});
+			return this.Style(this.modalPanel,{display:'none'});
 		if (bt===false || bt.command==='modalBox'){
-			this.setStyle(this.modalPanel,{display:'none'});
+			this.Style(this.modalPanel,{display:'none'});
 			this.modalPanel.innerHTML='';
 			return this;
 		}
 		if (bt===true)
-			return this.setStyle(this.modalPanel,{display:''});
-		this.setStyle(this.modalPanel,{display:'block'});
+			return this.Style(this.modalPanel,{display:''});
+		this.Style(this.modalPanel,{display:'block'});
 		var w=this.modalPanel.clientWidth,h=this.modalPanel.clientHeight;
 		var top=Math.ceil(bt.layerY/(this.iconSize+8))*(this.iconSize+8)-4;
 		var left=bt.layerX-Math.floor(w/2);
 		if (left<10) left=10;
 		if(left+w>=document.body.clientWidth) left=Math.floor((document.body.clientWidth-w)/2);
 		if (left<0) left=0;
-		this.setStyle(this.modalPanel,{top:top+'px',left:left+'px'});
+		this.Style(this.modalPanel,{top:top+'px',left:left+'px'});
 	},/*用modal 显示一段信息*/
 	modalMsg:function(bt,txt){
 		this.modalBox(false);
 		var b=document.createElement('div');
 		b.inEditButton={command:'modalBox'};
 		b.innerHTML=this.__(txt);
-		this.setStyle(b,{cursor:'pointer'});
+		this.Style(b,{cursor:'pointer'});
 		this.modalPanel.appendChild(b);
 		this.modalBox(bt);
 	},/*执行 document.execCommand*/
 	execCommand:function(cmd,arg){
-		if (this.Selection && this.Range) {
-			if(window.getSelection) {
-				this.Selection.removeAllRanges();
-				this.Selection.addRange(this.Range);
-			}else{
-				this.Range.select();
+		if (!this.Selection || !this.Range) return;
+		if(this.browser('firefox','mozilla')) {
+			if(this.insActive.childNodes.length==1){
+				this.E({tagName:'BR',_moz_dirty:''},this.insActive);
+				this.E({tagName:'BR',_moz_dirty:'',type:"_moz"},this.insActive);
 			}
+			this.Selection.removeAllRanges();
+			this.Selection.addRange(this.Range);
+		}else{
+			this.Range.select();
 		}
 		document.execCommand(cmd,false,arg);
 	},/*用一个标签代码包裹htmlcode代码,为了方便程序*/
@@ -349,7 +334,6 @@ inEdit.__('zh-cn',{
 	'saveall':'全部保存',
 	'undo':'后退',
 	'redo':'前进',
-	'firefox`s compatible problem':'<b style="color:red">在firefox或mozilla浏览器的兼容性问题<br>第一行不能操作<br>可以先把第一行空出来<br>操作完后再删除第一行来解决设置第一行样式的需求</b>',
 	'plase select image or text before':'<b style="color:red">请先选择一个图片或选择一段文本</b>',
 	'plase select link title or click image before':'<b style="color:red">请先选择一段链接文本或点击一个图片</b>',
 	'plase select text before under msie':'<b style="color:red">请先选择一段被替换掉的文字</b>'
@@ -439,20 +423,20 @@ inEdit.mixin({
 			elem.inEditButton={command : 'fontname',arg:v};
 			elem.innerHTML=this.tagWrap('<font face="'+v+'">'+k+'</font>');
 			if(at.indexOf('last')==-1)
-				this.setStyle(elem,{borderBottom:'1px solid #ccc',paddingBottom:'2px'});
+				this.Style(elem,{borderBottom:'1px solid #ccc',paddingBottom:'2px'});
 			this.modalPanel.appendChild(elem);
 		});
 		this.modalBox(bt);
 	},
 	onformatblock:function(bt){
-		var sel={'p' : 'Paragraph', 'pre' : 'Pre', 'h6' : 'H6', 'h5' : 'H5', 'h4' : 'H4', 'h3' : 'H3', 'h2' : 'H2', 'h1' : 'H1'};
+		var sel={'p' : 'Paragraph', 'pre' : 'Pre', 'h1' : 'H1', 'h2' : 'H2', 'h3' : 'H3', 'h4' : 'H4', 'h5' : 'H5', 'h6' : 'H6'};
 		this.modalBox(false);
 		for(var itm in sel) {
 			var elem=document.createElement(itm);
 			elem.inEditButton={command : 'formatblock',arg:'<'+itm+'>'};
 			elem.innerHTML=this.tagWrap(this.__(sel[itm]));
-			if(itm!='h1')
-				this.setStyle(elem,{borderBottom:'1px solid #ccc',paddingBottom:'2px'});
+			if(itm!='h6')
+				this.Style(elem,{borderBottom:'1px solid #ccc',paddingBottom:'2px'});
 			this.modalPanel.appendChild(elem);
 		}
 		this.modalBox(bt);
@@ -482,8 +466,7 @@ inEdit.mixin({
 				elem.src=this.transparentGif;
 				elem.inEditButton={command : bt.arg,arg:sel[i]};
 				var st={width:'36px',height:'14px',margin:'1px',cursor:'pointer','background-color':sel[i]};
-				document.title=sel[i];
-				this.setStyle(elem,st);
+				this.Style(elem,st);
 			}
 			this.modalPanel.appendChild(elems);
 		}
@@ -550,7 +533,7 @@ inEdit.mixin({
 			'<option value="" '+(options.target==''?'selected="selected"':'')+'" />'+this.__('current window')+'</option>'+
 			'<option value="_blank"  '+(options.target!=''?'selected="selected"':'')+' />'+this.__('new window')+'</option></select></div>';
 		var elem=document.createElement('center');
-		this.setStyle(elem,{
+		this.Style(elem,{
 			border:'1px solid #CCC',
 			padding:'2px',
 			cursor:'pointer'
@@ -604,7 +587,7 @@ inEdit.mixin({
 			'<div style="margin:4px 0;"><label>'+this.__('image src')+'</label><input name="src" value="'+options.src+'"/></div>'+
 			'<div style="margin:4px 0;"><label>'+this.__('alt text')+'</label><input name="alt" value="'+options.alt+'"/></div>';
 		var elem=document.createElement('center');
-		this.setStyle(elem,{
+		this.Style(elem,{
 			border:'1px solid #CCC',
 			padding:'2px',
 			cursor:'pointer'

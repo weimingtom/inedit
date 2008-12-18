@@ -7,18 +7,21 @@
  *
  * $Author: achun (achun.shx at gmail.com)
  * $Create Date: 2008-10-30
- * $Revision: 2008-11-13
+ * $Revision: 2008-12-18
  ******/
+function Log(){
+	for (var i=0;i<arguments.length ;i++ ){
+		var o=arguments[i];
+		if (window.console && window.console.log && window.console.dir){
+			if (typeof o=='object') window.console.dir(o);
+			else window.console.log(o);
+		}else
+			alert(o);
+	}
+}
 /**
  * 混入模式的对象成员覆盖式扩展,使用此模式后prototype属性将不再可靠
  */
-function Log(o){
-	if (window.console && window.console.log) {
-		if (typeof o=='object') window.console.dir(o);
-		else window.console.log(o);
-	}
-}
-
 function inMixin(){
 	var ths=this,i=0;
 	if (ths==window){
@@ -30,9 +33,8 @@ function inMixin(){
 		return ths;
 	}
 	for (;i<arguments.length ;i++){
-		for (var a in arguments[i]){
+		for (var a in arguments[i])
 			ths[a]=arguments[i][a];
-		}
 	}
 	return ths;
 }
@@ -61,7 +63,44 @@ function inI18N (txt,lang){
 	}
 	return t[s];
 };
-
+/**
+ *cookie操作,修改自jQuery的cookie插件
+ */
+function inCookie(name,value,options){
+	if(undefined!=value){
+		options=options||{};
+		if(value===null){
+			value='';
+			options.expires=-1;
+		}
+		var expires='';
+		if(options.expires && (typeof options.expires=='number' || options.expires.toUTCString)){
+			var date;
+			if(typeof options.expires=='number'){
+				date=new Date();
+				date.setTime(date.getTime()+(options.expires*24*60*60*1000));
+			}else{
+				date=options.expires;
+			}
+			expires='; expires='+date.toUTCString();
+		}
+		var path=options.path?'; path='+(options.path):'';
+		var domain=options.domain?'; domain='+(options.domain):'';
+		var secure=options.secure?'; secure':'';
+		document.cookie=[name,'=',encodeURIComponent(value),expires,path,domain,secure].join('');
+	}else{
+		if(document.cookie){
+			var cookies=document.cookie.split(';');
+			for(var i=0;i<cookies.length;i++){
+				var cookie=inCore.trim(cookies[i]);
+				if(cookie.slice(0,name.length+1)==(name+'=')){
+					return decodeURIComponent(cookie.slice(name.length+1));
+				}
+			}
+		}
+		return null;
+	}
+};
 /**
  *基于对象的Core操作
  */
@@ -74,10 +113,20 @@ var inCore={
 			var is=(ua.match(/\b(chrome|opera|safari|msie|firefox)\b/) || ['','mozilla'])[1];
 			var r='(?:'+is+'|version)[\\/: ]([\\d.]+)';
 			var v=(ua.match(new RegExp(r)) ||[])[1];
-			return {is:is,ver:v};
-	})(),/*转换到驼峰格式*/
+			return inMixin(function(){
+				for (var i=0;i<arguments.length ;i++ )
+					if (this.browser.is==arguments[i]) return true;
+				return false;
+			},
+				{is:is,ver:v}
+			);
+	})(),/*转换到驼峰风格*/
 	camelize : function(s) {
 		return s.replace(/\-(.)/g, function(m, l){return l.toUpperCase()});
+	},/*逆驼峰风格*/
+	uncamelize : function (s, delimiter) {
+		delimiter = delimiter || '-';
+		return s.replace(/([A-Z])/g, delimiter + '$1').toLowerCase();
 	},
 	trim:function(text){
 		return (text || "").replace( /^\s+|\s+$/g, "" );
@@ -102,24 +151,57 @@ var inCore={
 			ret.push(v);
 		},true);
 		return ret;
+	},/*把后续数组合并到第一个数组,并剔除重复的数据*/
+	arrayMerge:function(t){
+		var pos=1;
+		var unsigned=t;
+		if (typeof unsigned=='string') {
+			t=arguments[1];
+			pos=2;
+			if (!(t instanceof Array)) return this;
+			if(unsigned=='all' || unsigned=='first')
+			for (var i=0;i<t.length-1 ;i++)
+			for (var j=i+1;j<t.length ;)
+				if (t[i]===t[j])
+					t.splice(j,1);
+				else j++;
+		}else
+			unsigned='other';
+		for (var j=pos;j<arguments.length ;j++ ) {
+			var a=arguments[j];
+			if (!(t instanceof Array) || !a.length) continue;
+			for (var i=0;i<a.length;i++ ){
+				var find=false;
+				if(unsigned=='other'||unsigned=='all')
+				for (var k=0;k<t.length ;k++)
+					if (t[k]===a[i]) {
+						find=true;
+						break;
+					}
+				if (!find)
+					t.push(a[i]);
+			}
+		}
+		return this;
 	},
 	/*遍历对象,回调fun的参数:(v,k,['first','even','odd','lasteven','lastodd'])*/
-	each:function(obj,fun,bylength){
+	each:function(obj,fun,objlength){
 		if(typeof fun!='function' && typeof obj=='function'){
-			var fn=obj,a=this,bylength=fun;
+			var fn=obj,a=this,objlength=fun;
 		}else{
 			var fn=fun,a=obj;
 		}
 		var ret=0,odd=false;
-		if(a instanceof Array)
+		if (typeof a=='string') a=a.split(',');
+		if(a instanceof Array){
 			for (var i=0;i<a.length;i++){
 				odd=!odd;
 				var even=odd?'even':'odd';
 				var at=i==0?'first':i==a.length-1?'last'+even:even;
 				if(false===fn.call(this,a[i],i,at)) break;
 			}
-		else if (typeof a == 'object')
-			if(bylength)
+		}else if (typeof a == 'object'){
+			if(objlength)
 				for (var i=0;i<a.length;i++){
 					odd=!odd;
 					var even=odd?'even':'odd';
@@ -137,67 +219,114 @@ var inCore={
 					if(false===fn.call(this,a[i],i,at)) break;
 				}
 			}
-		else if (typeof a == 'function' && a.len)
+		}else if (typeof a == 'function' && a.len){
 			for (var i=0;i<a.len;i++){
 				odd=!odd;
 				var even=odd?'even':'odd';
 				var at=i==0?'first':i==a.len-1?'last'+even:even;
 				if(false===fn.call(this,a['0'+i],i,at)) break;
 			}
-		return this;
-	},/*递归的遍历node的所有子节点*/
-	walkNode:function(node,fun,nodeType){
-		nodeType=nodeType||1;
-		var ret,n=node.firstChild;
-		while(n){
-			if(n.nodeType==nodeType)
-				ret=fun.call(this,n);
-			if(true===ret) return true;//彻底中断walk
-			if(false!==ret)//是否允许递归子节点
-				if(true===this.walkNode(n,fun,nodeType)) break;//彻底中断walk
-			n=n.nextSibling;
 		}
 		return this;
-	},/*向上追溯,符合要求的node,默认是nodeType==1的节点*/
+	},/*递归的遍历node的所有子节点*/
+	walkNode:function(node,fun,deep,reverse,nodeType){
+		nodeType=nodeType||1;
+		if (undefined===deep) deep=true;
+		var ret,n=reverse?node.lastChild:node.firstChild;
+		var max=node.childNodes.length;
+		var i=reverse?max-1:0;
+		for (var i=0;i<max;i++ ) {
+			var n=reverse?node.childNodes[max-i-1]:node.childNodes[i];
+			if(n.nodeType==nodeType)
+				ret=fun.call(this,n);
+			else 
+				continue;
+			if(true===ret) return true;//彻底中断walk
+			if(deep && false!==ret){//是否允许递归子节点
+				if(true!==deep) deep--;
+				if(deep && true===this.walkNode(n,fun,deep,reverse,nodeType)) break;//彻底中断walk
+			}
+		}
+		return this;
+	},/*向上追溯 node and parentNode 节点*/
 	traceNode:function(node,fun){
-		if(!fun)
-			if (!node || node.nodeType==1)
-				return node;
-			else
-				return node.parentNode;
+		if(!fun || !node)
+			return this;
 		var n=node;
 		while(n){
 			if(false===fun.call(this,n)) break;
 			n=n.parentNode;
 		}
 		return this;
-	},
-	/*设置节点的样式*/
-	setStyle : function(nodes,st) {
-		if (!nodes || (typeof st!='object')) return this;
-		var ns=nodes;
-		if(ns.nodeType) var ns=[nodes];
+	},/*子节点统计*/
+	childNodesCount:function(node,find,tagName,nodeType){
+		var cnt=0;
+		this.walkNode(node,function(n){
+			if (tagName){
+				if(n.tagName==tagName) cnt++;
+			}else cnt++;
+			if (find && cnt>1) return true;
+		},false,false,nodeType);
+		return cnt;
+	},/*获取elem的某个style属性*/
+	getStyle:function (elem, property){
+		property=this.camelize(property);
+		if (elem.currentStyle)// IE5+
+			return elem.currentStyle[property];
+		if(elem.style[property])
+			return elem.style[property];
+		if (document.defaultView.getComputedStyle)// FF/Mozilla
+			var currentStyle = document.defaultView.getComputedStyle(elem, null);
+		else if (window.getComputedStyle)// NS6+
+			var currentStyle = window.getComputedStyle(elem, null);
+		return currentStyle[property] || currentStyle.getPropertyValue(this.uncamelize(property));
+	},/*提取(ify保留默认值)/设置节点的样式*/
+	Style : function(nodes,st,at,ify) {
+		if(!nodes || (typeof st!='object')) return this;
+		if(nodes.nodeType)
+			var ns=[nodes];
+		else
+			var ns=nodes;
+		var j=-1;
 		for (var i=0;i<ns.length ;i++ ) {
 			if (ns[i].nodeType!=1) continue;
+			j++;
 			var style = ns[i].style;
 			for(var itm in st){
-				var key=this.camelize(itm);
-				if (',float,opacity,'.indexOf(','+itm+',')!=-1) {
-					switch (itm) {
-					case 'opacity':
-						if (this.browser.is=='msie')
-							style.filter = 'alpha(opacity=' + Math.round(st[itm]*100) + ')';
-						else
-							style.opacity = st[itm];
-						break;
-					case 'float':
-						style['cssFloat'] = style['styleFloat'] = st[itm];
-						break;
-					}
+				if (undefined!=at && at==j) {
+					var s=this.getStyle(ns[i],itm);
+					if(!ify)
+						st[itm]=s;
+					else if(s!='')
+						st[itm]=s;
 					continue;
 				}
-				style[key] = st[itm];
+				var forie=itm.slice(0,1);
+				if (forie=='*' || forie=='_') itm=itm.slice(1);
+				else forie=false;
+				var key=this.camelize(itm);
+				switch (itm) {
+				case 'opacity':
+					if (this.browser.is=='msie' || forie){
+						if (forie==false || forie=='*' || this.browser.ver<7)
+							style.filter = 'alpha(opacity=' + Math.round(st[itm]*100) + ')';
+					}else{
+						
+						style.opacity = st[itm];
+					}
+					break;
+				case 'float':
+					style['cssFloat'] = style['styleFloat'] = st[itm];
+					break;
+				default:
+					if (this.browser.is=='msie' || forie){
+						if (forie==false || forie=='*' || this.browser.ver<7)
+							style[key] = st[itm];
+					}else
+						style[key] = st[itm];
+				}
 			}
+			if (undefined!=at && at==j) break;
 		}
 		return this;
 	},/*获取/设置节点的属性*/
@@ -233,7 +362,7 @@ var inCore={
 		else
 			var n=node,st=styles;
 		var e=document.createElement(tn);
-		this.Attr(e,attr).setStyle(e,st);
+		this.Attr(e,attr).Style(e,st);
 		if (n){
 			n.appendChild(e);
 			return this;
@@ -241,7 +370,51 @@ var inCore={
 		return e;
 	}
 }
-
+/**
+ *垃圾收集,需要对象自己实现处理接口 function inGC 解决
+ *Element注册Event后,Element又更改的情况
+ */
+var inGC={
+	isinGC:'8',
+	Queues:[],
+	reg:function(ths,tag){
+		if(tag===window || tag===document) return;
+		var pos=this.findQueue(tag);
+		if (null!==pos) {
+			var queue=this.Queues[pos].inQueue;
+			for (var i=0;i<queue.length;i++)
+				if (queue[i]===ths) return;
+			queue.push(ths);
+		}else{
+			this.Queues.push({domain:tag,inQueue:[ths]});
+		}
+	},
+	findQueue:function(domain){
+		for (var i=0;i<this.Queues.length ; i++) {
+			if (this.Queues[i].domain===domain)
+				return i;
+		}
+		return null;
+	},
+	Removed:function(tag){
+		if (!tag) return;
+		var pos=this.findQueue(tag);
+		if (null===pos) return;
+		var queue=this.Queues[pos].inQueue;
+		for (var i=0;i<queue.length;i++) {
+			if (!queue[i]) continue;
+			if (typeof queue[i].inGC=='function')
+				queue[i].inGC(tag);
+			if(queue[i].isinQueue && typeof queue[i].removeQueue=='function')
+				queue[i].removeQueue(tag);
+		}
+		this.Queues.splice(pos,1);
+	}
+}
+if(document.attachEvent)
+	document.attachEvent("DOMNodeRemoved", function(e){inGC.Removed(e.target || e.srcElement);}, false);
+else if(document.addEventListener)
+	document.addEventListener("DOMNodeRemoved", function(e){inGC.Removed(e.target || e.srcElement);}, false);
 /**
  *队列/命令/事件instance/修正浏览器见事件属性的兼容性
  *
@@ -318,13 +491,16 @@ var inQueue={
 			}
 			q.type[type]=genEventFun(this);
 			q.type[type].len=0;
-			if(domain.addEventListener)
+			if(domain.addEventListener){
 				domain.addEventListener(type,q.type[type],false);
-			else if(domain.attachEvent)
+				inGC.reg(this,domain);
+			}else if(domain.attachEvent){
 				domain.attachEvent("on"+type, q.type[type]);
+				inGC.reg(this,domain);
+			}
 			ef=q.type[type];
 		}
-		ef['0'+(ef.len++)]={fun:fn,args:[].slice.call(arguments,4)};
+		ef['0'+(ef.len++)]={fun:fn,args:Array.prototype.slice.call(arguments,4)};
 		return this;
 	},/*删除一个或全部队列,也可以在window unload 中设置这调用*/
 	removeQueue:function (domain,type){
@@ -381,13 +557,13 @@ var inQueue={
 		}
 		var fns=this.findQueue(domain,type);
 		var re=false;
-		var args=[].slice.call(arguments,3);
+		var args=Array.prototype.slice.call(arguments,3);
 		var ret=type=='Array'?[]:null,step=1,re,removeEvent=false,removeQueue=false;
 		var cancelBubble=false;
 		for (var i=0;i<fns.len ;i=i+step) {
 			var fn=fns['0'+i];
 			if(!fn) continue;
-			var arg=args.concat(fn.args);
+			var arg=fn.args.concat(args);
 			re=fn.fun.apply(withthis,arg);
 			if(isEvent){
 				if(false===re && true===e.cancelBubble) break;//结束冒泡的条件并且结束队列
@@ -403,11 +579,8 @@ var inQueue={
 				switch (type) {
 				case 'Chain':withthis=re;break;//链式改变 this 
 				case 'Relay'://值接力
-					args=[e].concat([].slice.call(arguments,4));
-					if (re instanceof Array)
-						args.concat(re);
-					else
-						args.push(re);
+					args=Array.prototype.slice.call(arguments,3);
+					args.push(re);
 					break;
 				case 'Offset':step=parseInt(re)||0;break;//跳转/步长
 				case 'Array':ret.push(re);
@@ -428,28 +601,28 @@ var inQueue={
 	addCmd:function(cmd,fn){
 		if (typeof cmd==='string' || typeof cmd==='number'){/*支持fn数组*/
 			var funs=typeof fn=='function'?[fn]:fn;
-			var args=[].slice.call(arguments,2);
+			var args=Array.prototype.slice.call(arguments,2);
 			for (var i=0;i<funs.length ;i++ ) 
 				this.addQueue.apply(this,[this,'this',funs[i],cmd].concat(args));
 		}else{/*简单设定多个队列*/
-			var args=[].slice.call(arguments,1);
+			var args=Array.prototype.slice.call(arguments,1);
 			for (var k in cmd)
 				this.addQueue.apply(this,[this,'this',cmd[k],k].concat(args));
 		}
 		return this;
 	},/*触发一个队列命令,如果附加了参数那么会覆盖 addCmd 中的附加参数*/
 	fireCmd:function(cmd){
-		var args=[this,'this',cmd].concat([].slice.call(arguments,1));
+		var args=[this,'this',cmd].concat(Array.prototype.slice.call(arguments,1));
 		return this.fireQueue.apply(this,args);
 	},/*添加 DOMElement 事件*/
 	addEvent:function(withthis,elem,type,fn){
 		if (typeof type==='string'){/*支持多 Element 绑定一个fun*/
 			var elems=elem.nodeType?[elem]:elem;
-			var args=[].slice.call(arguments,4);
+			var args=Array.prototype.slice.call(arguments,4);
 			for (var i=0;i<elems.length ;i++ )
 				this.addQueue.apply(this,[withthis,elems[i],fn,type].concat(args));
 		}else{/*一个 Element 绑定多个type和fun*/
-			var args=[].slice.call(arguments,3);
+			var args=Array.prototype.slice.call(arguments,3);
 			for (var k in type)
 				this.addQueue.apply(this,[withthis,elem,type[k],k].concat(args));
 		}
@@ -460,7 +633,7 @@ var inQueue={
 			var args=[null,e,withthis.type,withthis],i=2;
 		else
 			var args=[withthis,elem,e.type,e],i=3;
-		args.concat([].slice.call(arguments,i));
+		args.concat(Array.prototype.slice.call(arguments,i));
 		this.Queue.fire.apply(this,args);
 		return this;
 	}
