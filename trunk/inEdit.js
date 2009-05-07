@@ -9,7 +9,7 @@
  * 因此对 inEdit 对象来说不需要实例化,直接操作就行了
  * $Author: achun (achun.shx at gmail.com)
  * $Create Date: 2008-10-30
- * $Revision: 2008-12-18
+ * $Revision: 2009-05-07
  ******/
 
 /**
@@ -27,7 +27,7 @@
  *autoRemoveQueue属性是通知 inQueue 在window unload 时释放所有的监听事件
  **/
 var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
-	isinEdit:'8',
+	isinEdit:'9',
 	mixin:inMixin,
 	__:inI18N,
 	/*设置面板*/
@@ -120,24 +120,36 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 		panel.appendChild(box);
 		this.modalPanel=box;
 		return this;
+	},/*删除Panel面板*/
+	removePanel:function(){
+		if(!this.panel) return;
+		this.removeQueue(this.panel);
+		this.panel.parentNode.removeChild(this.panel);
 	},/*设置面板是否接受操作*/
 	onDisable:function(e){
 		var from='';
-		this.traceNode(e.target,function(n){
-			if('true'==n.contentEditable ){
-				from='instance';
-				return false;
-			}
-			if(n==this.panel){
-				from='panel';
-				return false;
-			}
-		});
+		if(e && e.target){
+			for(var i=0;i<this.Instances.length;i++)
+				if(e.target===this.Instances[i]){
+					from=e.target.contentEditable!='true'?'instanceText':'instance';
+					break;
+				}
+			if(!from) this.traceNode(e.target,function(n){
+				if('true'==n.contentEditable ){
+					from='instance';
+					return false;
+				}
+				if(n==this.panel){
+					from='panel';
+					return false;
+				}
+			});
+		}
 		var same=this.enable;
 		if(!from) {
 			this.enable=false;
 			this.modalBox();
-		}else if ('instance'==from)
+		}else if ('panel'!=from)
 			this.enable=true;
 		same=same==this.enable;
 		if (same) return;
@@ -147,7 +159,8 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 			st.opacity=this.enable?1:0.5;
 		this.walkNode(this.panel,function(node){
 			if (node.inEditButton)
-				this.Style(node,st);
+				//(from=='instance' || (from=='instanceText' && (node.inEditButton.command=='save' || node.inEditButton.command=='saveAll'))))
+					this.Style(node,st);
 			return false;
 		});
 	},/*面板发生了 chick */
@@ -181,15 +194,13 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 	addInstance:function(elems){
 		if (!this.Instances) this.Instances=[];
 		if(elems.nodeType==1) var ins=[elems];
-		else if(elems.length) var ins=elems;
+		else var ins=elems;
 		for (var i=0;i<ins.length ;i++ ){
-			if(ins[i].nodeType!=1 || ins[i].contentEditable===true) continue;
-			this.addEvent(this,ins[i],'click',this.insSelect);
+			if(ins[i].nodeType!=1 || ins[i].contentEditable=='true') continue;
 			ins[i].inEditSaveStyle={
 				border:ins[i].style.border,
 				padding:ins[i].style.padding
 			};
-			this.Style(ins[i],{border:'2px solid #F1CA7F',padding:"10px 0"});
 			/*fix browser bug*/
 			switch (this.browser.is) {
 			case 'msie':
@@ -199,33 +210,56 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 			case 'firefox':
 				break;
 			}
-			ins[i].contentEditable=true;
+			if(ins[i].nodeName=='DIV'){
+				this.Style(ins[i],{border:'2px solid #F1CA7F',padding:"10px 0"});
+				ins[i].contentEditable='true';
+				this.addEvent(this,ins[i],'click',this.insSelect);
+			}else{
+				this.Style(ins[i],{border:'1px solid #F1CA7F'});
+				this.addEvent(this,ins[i],'click',this.text);
+			}
 			this.Instances.push(ins[i]);
 		}
+	},/*纯文本修改*/
+	text:function(e){
+		this.insActive=this.insTarget=e.target;
+		var src=this.insActive.textContent || this.insActive.innerText;
+		var str=prompt('请输入文本',src);
+		if(str!=null) src==this.insActive.innerText?this.insActive.innerTextr=str:this.insActive.textContent=str;
 	},/*结束所有的可编辑 Elements ,并去除面板*/
 	remove:function(){
 		this.removeQueue();
 		this.Instances=[];
 		return this;
 	},/*结束某个或所有可编辑 Elements*/
-	removeInstance:function(domain){
-		this.each(this.Queues,function(q){
-			if ((undefined==domain || domain===q.domain) && 'true'==q.domain.contentEditable) {
-				q.domain.contentEditable="inherit";
-				this.Style(q.domain,q.domain.inEditSaveStyle);
-				delete q.domain.inEditSaveStyle;
-				this.removeQueue(q.domain);//删除事件
-				if(domain) return false;
-			}
-		});
-		if (undefined==domain) this.Instances=[];
-		else for (var i=0;i<this.Instaces.length ;i++ ) {
-			if (this.Instances[i]===domain) {
-				this.Instaces.splice(i,1);
-				break;
+	removeInstance:function(domainss){
+		var domains=domainss||[undefined];
+		if(domains && domains.nodeType) domains=[domainss];
+		for(var j=0;j<domains.length;j++){
+			var domain=domains[j];
+			this.each(this.Queues,function(q){
+				if (undefined==domain || domain===q.domain){
+					this.removeQueue(q.domain);//删除事件
+					q.domain.contentEditable="inherit";
+					this.Style(q.domain,q.domain.inEditSaveStyle);
+					q.domain.inEditSaveStyle=null;
+					if(domain) return false;
+				}
+			});
+			if (undefined==domain) this.Instances=[];
+			else for (var i=0;this.Instances && i<this.Instances.length ;i++ ) {
+				if (this.Instances[i]===domain) {
+					this.Instances.splice(i,1);
+					break;
+				}
 			}
 		}
+		if(!this.Instances || !this.Instances.length) this.removePanel();
 		return this;
+	},/*关闭当前激活的编辑*/
+	closeinsActive:function(){
+		this.removeInstance(this.insActive);
+		this.onDisable();
 	},/*设定被选中的可编辑 Element*/
 	insSelect:function(e){
 		this.modalBox();
@@ -265,17 +299,17 @@ var inEdit=inMixin({autoRemoveQueue:true},inCore,inQueue,{
 	},/*执行 document.execCommand*/
 	execCommand:function(cmd,arg){
 		if (!this.Selection || !this.Range) return;
-		if(this.browser('firefox','mozilla')) {
-			if(this.insActive.childNodes.length==1){
-				this.E({tagName:'BR',_moz_dirty:''},this.insActive);
-				this.E({tagName:'BR',_moz_dirty:'',type:"_moz"},this.insActive);
-			}
+		var removefirstChild=false;
+		if(this.browser.is=='firefox' || this.browser.is=='mozilla') {
+			this.E({tagName:'P',_moz_dirty:''},{display:'block',height:'0px',margin:0,padding:0},this.insActive,this.insActive.firstChild);
+			removefirstChild=true;
 			this.Selection.removeAllRanges();
 			this.Selection.addRange(this.Range);
 		}else{
 			this.Range.select();
 		}
 		document.execCommand(cmd,false,arg);
+		if (removefirstChild) this.insActive.removeChild(this.insActive.firstChild);
 	},/*用一个标签代码包裹htmlcode代码,为了方便程序*/
 	tagWrap:function(htmlcode,tag){
 		switch (tag) {
@@ -312,6 +346,7 @@ inEdit.__('zh-cn',{
 	'font size...':'字大小',
 	'font family...':'字体',
 	'formatblock':'格式标签',
+	'headings':'大标题',
 	'forecolor':'文字颜色',
 	'backcolor':'背景颜色',
 	'edit image':'图片',
@@ -332,8 +367,9 @@ inEdit.__('zh-cn',{
 	'pre':'格式化文本',
 	'save':'保存',
 	'saveall':'全部保存',
-	'undo':'后退',
-	'redo':'前进',
+	'close instance actived':'关闭此编辑',
+	'undo':'撤消',
+	'redo':'重做',
 	'plase select image or text before':'<b style="color:red">请先选择一个图片或选择一段文本</b>',
 	'plase select link title or click image before':'<b style="color:red">请先选择一段链接文本或点击一个图片</b>',
 	'plase select text before under msie':'<b style="color:red">请先选择一段被替换掉的文字</b>'
@@ -343,19 +379,20 @@ inEdit.mixin({
 	transparentGif:'/style/imgs/pixel.gif',
 	iconsPath : '/style/imgs/nicEditorIconsfull.gif',
 	buttonList : [
-		'save','saveall','undo','redo','|',
+		'closeinsActive','save','saveall','undo','redo','|',
 		'bold','italic','underline','strikethrough','subscript','superscript',
-		'removeformat',
-		'fontfamily','fontsize','bgcolor','fgcolor','|',
+		'fontfamily','fontsize',
+		'fgcolor','bgcolor','removeformat','|',
 		'left','center','right','justify',
 		'indent','outdent','|',
 		'link','unlink',
 		'image','hr','|',
-		'ol','ul','formatblock'
+		'ol','ul','paragraph','headings'
 		],
-	iconList:{'xhtml':1,'bgcolor':2,'fgcolor':3,'bold':4,'center':5,'hr':6,'indent':7,'italic':8,'justify':9,'left':10,'ol':11,'outdent':12,'right':13,'save':14,'strikethrough':15,'subscript':16,'superscript':17,'ul':18,'underline':19,'image':20,'link':21,'unlink':22,'close':23,'removeformat':24,'arrow':25,'undo':26,'redo':27,'saveall':29,'formatblock':30,'fontfamily':31,'fontsize':32},
+	iconList:{'xhtml':1,'bgcolor':2,'fgcolor':3,'bold':4,'center':5,'hr':6,'indent':7,'italic':8,'justify':9,'left':10,'ol':11,'outdent':12,'right':13,'save':14,'strikethrough':15,'subscript':16,'superscript':17,'ul':18,'underline':19,'image':20,'link':21,'unlink':22,'closeinsActive':34,'removeformat':24,'arrow':25,'undo':26,'redo':27,'saveall':29,'paragraph':30,'fontfamily':31,'fontsize':32,'headings':33},
 	iconSize:18,
 	buttons : {
+		'closeinsActive' : {text : 'close Instance Actived', command : 'closeinsActive'},
 		'save' : {text : 'save', command : 'save'},
 		'saveall' : {text : 'saveall', command : 'saveAll'},
 		'bold' : {text : 'Bold', command : 'bold'},
@@ -374,14 +411,15 @@ inEdit.mixin({
 		'outdent' : {text : 'Outdent', command : 'outdent'},
 		'hr' : {text : 'Horizontal Rule', command : 'oninserthorizontalrule'},
 		'removeformat' : {text : 'RemoveFormat', command : 'removeformat'},
-		'undo' : {text : 'Undo', command : 'onundo'},
-		'redo' : {text : 'Redo', command : 'onredo'},
+		'undo' : {text : 'Undo', command : 'undo'},
+		'redo' : {text : 'Redo', command : 'redo'},
 		'unlink':{text : 'remove link', command : 'unlink'},
 		/*pop box*/
 		'link':{text : 'edit link', command : 'onlink'},
 		'fontsize' :{text : 'font size...', command : 'onfontsize'},
 		'fontfamily' :{text : 'font family...', command : 'onfontfamily'},
-		'formatblock' :{text : 'formatblock', command : 'onformatblock'},
+		'paragraph' :{text : 'paragraph', command : 'formatblock',arg:'<P>'},//???
+		'headings' :{text : 'headings', command : 'onheadings'},
 		'bgcolor' :{text : 'backcolor', command : 'oncolor',arg:'backcolor'},
 		'fgcolor' :{text : 'forecolor', command : 'oncolor',arg:'forecolor'},
 		'image' :{text : 'edit image', command : 'onimage'}
@@ -428,8 +466,8 @@ inEdit.mixin({
 		});
 		this.modalBox(bt);
 	},
-	onformatblock:function(bt){
-		var sel={'p' : 'Paragraph', 'pre' : 'Pre', 'h1' : 'H1', 'h2' : 'H2', 'h3' : 'H3', 'h4' : 'H4', 'h5' : 'H5', 'h6' : 'H6'};
+	onheadings:function(bt){
+		var sel={'h1' : 'H1', 'h2' : 'H2', 'h3' : 'H3', 'h4' : 'H4', 'h5' : 'H5', 'h6' : 'H6'};
 		this.modalBox(false);
 		for(var itm in sel) {
 			var elem=document.createElement(itm);

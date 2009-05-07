@@ -7,8 +7,11 @@
  *
  * $Author: achun (achun.shx at gmail.com)
  * $Create Date: 2008-10-30
- * $Revision: 2008-12-18
+ * $Revision: 2009-05-07
  ******/
+/**
+ * 混入模式的对象成员覆盖式扩展,使用此模式后prototype属性将不再可靠
+ */
 function Log(){
 	for (var i=0;i<arguments.length ;i++ ){
 		var o=arguments[i];
@@ -19,9 +22,6 @@ function Log(){
 			alert(o);
 	}
 }
-/**
- * 混入模式的对象成员覆盖式扩展,使用此模式后prototype属性将不再可靠
- */
 function inMixin(){
 	var ths=this,i=0;
 	if (ths==window){
@@ -106,20 +106,14 @@ function inCookie(name,value,options){
  */
 var inCore={
 	mixin:inMixin,
-	isinCore:'8',
+	isinCore:'9',
 	/*浏览器识别*/
 	browser:(function(){
 			var ua=navigator.userAgent.toLowerCase();
 			var is=(ua.match(/\b(chrome|opera|safari|msie|firefox)\b/) || ['','mozilla'])[1];
 			var r='(?:'+is+'|version)[\\/: ]([\\d.]+)';
 			var v=(ua.match(new RegExp(r)) ||[])[1];
-			return inMixin(function(){
-				for (var i=0;i<arguments.length ;i++ )
-					if (this.browser.is==arguments[i]) return true;
-				return false;
-			},
-				{is:is,ver:v}
-			);
+			return {is:is,ver:v};
 	})(),/*转换到驼峰风格*/
 	camelize : function(s) {
 		return s.replace(/\-(.)/g, function(m, l){return l.toUpperCase()});
@@ -268,9 +262,25 @@ var inCore={
 			if (find && cnt>1) return true;
 		},false,false,nodeType);
 		return cnt;
+	},/*剔除nodes里是child的node,保留具有parent的nodes*/
+	nodesParents:function(ns){
+		var len=ns.length;
+		for (var k=0;k<ns.length;){
+			len=ns.length;
+			this.walkNode(ns[k],function(n){
+				for (var i=0;i<ns.length;){
+					if (n===ns[i])
+						ns.splice(i,1);
+					else i++;
+				}
+			});
+			if (len==ns.length) k++;
+		}
+		return ns;
 	},/*获取elem的某个style属性*/
 	getStyle:function (elem, property){
-		property=this.camelize(property);
+		if (property=='class') property='className';
+		else property=this.camelize(property);
 		if (elem.currentStyle)// IE5+
 			return elem.currentStyle[property];
 		if(elem.style[property])
@@ -280,7 +290,8 @@ var inCore={
 		else if (window.getComputedStyle)// NS6+
 			var currentStyle = window.getComputedStyle(elem, null);
 		return currentStyle[property] || currentStyle.getPropertyValue(this.uncamelize(property));
-	},/*提取(ify保留默认值)/设置节点的样式*/
+	},
+	/*提取(ify保留默认值)/设置节点的样式*/
 	Style : function(nodes,st,at,ify) {
 		if(!nodes || (typeof st!='object')) return this;
 		if(nodes.nodeType)
@@ -310,10 +321,8 @@ var inCore={
 					if (this.browser.is=='msie' || forie){
 						if (forie==false || forie=='*' || this.browser.ver<7)
 							style.filter = 'alpha(opacity=' + Math.round(st[itm]*100) + ')';
-					}else{
-						
+					}else
 						style.opacity = st[itm];
-					}
 					break;
 				case 'float':
 					style['cssFloat'] = style['styleFloat'] = st[itm];
@@ -329,13 +338,22 @@ var inCore={
 			if (undefined!=at && at==j) break;
 		}
 		return this;
+	},/*获取节点的属性*/
+	getAttr:function(node,attr){
+		if(typeof attr =='string')//instanceof Array)
+			
+		if(attr==="class" || attr==="className")
+			return node.className;
+		if(attr==="for" ) 
+			return node.htmlFor;
+		return node.getAttribute(attr)||node[attr];
 	},/*获取/设置节点的属性*/
 	Attr: function(node,attrs) {
 		if (!node.nodeType || !attrs) return this;
 		if(typeof attrs=='string')
-			if(attrs.indexOf(',')==-1)
-				return node.getAttribute(attrs)||node[attrs];
-			else
+			if(attrs.indexOf(',')==-1){
+				return this.getAttr(node,attrs);
+			}else
 				attrs=attrs.split(',');
 		if (attrs instanceof Array){
 			var ret={};
@@ -352,19 +370,24 @@ var inCore={
 		}
 		return this;
 	},/*便捷的建立Element*/
-	E:function(attrs,styles,node){
+	E:function(attrs,styles,node,at){
 		if (typeof attrs=='string')
 			var tn=attrs,attr;
 		else
 			var tn=attrs.tagName,attr=attrs;
-		if (styles && styles.nodeType)
+		if (styles && styles.nodeType){
 			var n=styles,st;
-		else
+			at=node;
+		}else{
 			var n=node,st=styles;
+		}
 		var e=document.createElement(tn);
 		this.Attr(e,attr).Style(e,st);
 		if (n){
-			n.appendChild(e);
+			if(!at)
+				n.appendChild(e);
+			else
+				n.insertBefore(e,at);
 			return this;
 		}
 		return e;
